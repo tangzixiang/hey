@@ -18,6 +18,8 @@ package requester
 import (
 	"bytes"
 	"crypto/tls"
+	"encoding/json"
+	uuid "github.com/satori/go.uuid"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -265,6 +267,7 @@ func (b *Work) runWorkers() {
 // cloneRequest returns a clone of the provided *http.Request.
 // The clone is a shallow copy of the struct and its Header map.
 func cloneRequest(r *http.Request, body []byte) *http.Request {
+	requestID := uuid.NewV4().String()
 	// shallow copy of the struct
 	r2 := new(http.Request)
 	*r2 = *r
@@ -273,9 +276,22 @@ func cloneRequest(r *http.Request, body []byte) *http.Request {
 	for k, s := range r.Header {
 		r2.Header[k] = append([]string(nil), s...)
 	}
+
+	r2.Header.Set("X-Request-Id", requestID)
 	if len(body) > 0 {
+		m := map[string]interface{}{}
+		err := json.Unmarshal(body, &m)
+		if err != nil {
+			panic(err)
+		}
+		m["id"] = requestID
+		body, err = json.Marshal(m)
+		if err != nil {
+			panic(err)
+		}
 		r2.Body = ioutil.NopCloser(bytes.NewReader(body))
 	}
+
 	return r2
 }
 
